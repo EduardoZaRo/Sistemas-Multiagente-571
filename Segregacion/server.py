@@ -68,7 +68,7 @@ def schelling_draw(agent):
 
 
 
-happy_chart = mesa.visualization.ChartModule([{"Label": "happy", "Color": "Black"}])
+happy_chart = mesa.visualization.ChartModule([{"Label": "happy", "Color": "Black"}], data_collector_name="datacollector")
 
 mapas = ['circulo_2.jpg', 'mexico_2.jpg', 'cuadrado_2.jpg', 'usa.jpg']
 cantidad_razas_random = random.randint(2,5)

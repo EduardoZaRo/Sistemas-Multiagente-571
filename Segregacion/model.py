@@ -3,6 +3,14 @@ import math
 import numpy as np
 import matplotlib.pyplot as plt
 import random
+from sklearn.tree import DecisionTreeClassifier
+from sklearn.naive_bayes import GaussianNB
+from sklearn.naive_bayes import BernoulliNB
+from sklearn.neighbors import KNeighborsClassifier
+from sklearn.linear_model import LogisticRegression
+from sklearn.linear_model import SGDClassifier
+from sklearn.linear_model import PassiveAggressiveClassifier
+from sklearn.ensemble import GradientBoostingClassifier
 '''
 image = plt.imread('circulo.jpg')
 image_copy = image.copy()
@@ -47,8 +55,12 @@ class SchellingAgent(mesa.Agent):
             self.discrete_opinion = opinions[1]
         else:
             self.discrete_opinion = opinions[2]
-        
-
+        priority = ['color', 'opinion']    
+        self.priority = priority[self.index]
+        self.counter = 0
+        self.train = np.zeros((20,3))
+        self.test = np.zeros((20,1))
+        self.classificator = None
     def step(self):
         similar = 0
         other = 0
@@ -56,12 +68,24 @@ class SchellingAgent(mesa.Agent):
         priority = ['color', 'opinion']
         opinions = ['izq', 'cent', 'der']
         
+        
+        
+        
         self.priority = priority[self.index]
         if(self.priority == 'color'):
             self.model.color_prior += 1
         else:
             self.model.op_prior += 1
         not_again = False
+
+        ticks = 0   
+        if(self.model.similar_wanted >= 65):
+            ticks = 50  
+            self.train = np.zeros((50,3))
+            self.test = np.zeros((50,1))
+        else:
+            ticks = 20
+
 
         for neighbor in self.model.grid.iter_neighbors(self.pos, True):
             if(self.priority == 'color'):
@@ -76,7 +100,8 @@ class SchellingAgent(mesa.Agent):
                     treshold = 0.15
                     if abs(self.opinion - neighbor.opinion ) <= treshold:
                         similar += 1
-                        self.opinion = abs(self.opinion + neighbor.opinion )/2 #Modelo simplificado por mientras
+                        if(self.counter <= ticks):
+                            self.opinion = abs(self.opinion + neighbor.opinion )/2 #Modelo simplificado por mientras
                         if(self.opinion >= 0 and self.opinion <= .33):
                             self.discrete_opinion = opinions[0]
                         elif(self.opinion <= .66):
@@ -94,22 +119,57 @@ class SchellingAgent(mesa.Agent):
                     else:
                         other += 1
             except:
-                continue     
+                continue    
+
         if(self.discrete_opinion == 'izq'):
             self.model.izq += 1
         if(self.discrete_opinion == 'cent'):
             self.model.cent += 1    
         if(self.discrete_opinion == 'der'):
             self.model.der += 1
+            
 
         total_nearby = similar + other
-        if(similar >= self.model.similar_wanted * total_nearby / 100):
-            self.happy = 1
-            self.model.happy += 1
-        else:
-            self.happy = 0
-            self.model.grid.move_to_empty(self)
+        per_similar = self.model.similar_wanted * total_nearby / 100
+        if(self.counter <= ticks):
+            if(similar >= per_similar):
+                self.happy = 1
+                self.model.happy += 1
+            else:
+                self.happy = 0
+                self.model.grid.move_to_empty(self)
+        
+        
+        
+        
 
+        
+        if(self.counter < ticks):
+            #self.train.append(per_similar)
+            self.train[self.counter][0] = similar
+            self.train[self.counter][1] = self.index #For priority
+            self.train[self.counter][2] = other
+            self.test[self.counter] = self.happy
+        elif(self.counter == ticks):
+
+
+            try:
+                self.classificator = SGDClassifier(warm_start=True).fit(self.train, self.test.ravel())
+            except:
+                self.counter -= 1
+        else:
+            self.happy = self.classificator.predict(np.array([similar, self.index, other]).reshape(1, -1))
+            
+            if(self.happy == 1): #Si el agente es feliz el modelo fue exitoso
+                self.model.happy += 1
+            else:               #Si el agente no es feliz se agregan los datos de entrenamiento
+  
+                self.model.grid.move_to_empty(self)
+        self.counter += 1 
+
+            
+
+            
 
 
 
@@ -200,10 +260,18 @@ class Schelling(mesa.Model):
         self.op_prior = 0
         self.color_prior = 0
         self.datacollector = mesa.DataCollector(
-            {"happy": "happy"},  # Model-level count of happy agents
+            {"happy": "happy"},
             {"x": lambda a: a.pos[0], "y": lambda a: a.pos[1]}
         )
- 
+        self.dataizq = mesa.DataCollector(
+            {"izq": lambda a: a.izq}
+        )
+        self.datacent = mesa.DataCollector(
+            {"cent": lambda a: a.cent}
+        )
+        self.datader = mesa.DataCollector(
+            {"der": lambda a: a.der}
+        )
         # Set up agents
         # We use a grid iterator that returns
         # the coordinates of a cell as well as
@@ -250,6 +318,10 @@ class Schelling(mesa.Model):
         
         self.running = True
         self.datacollector.collect(self)
+        self.dataizq.collect(self)
+        self.datacent.collect(self)
+        self.datader.collect(self)
+        
         self.last_mode = self.ta
     def step(self):
         
@@ -257,6 +329,7 @@ class Schelling(mesa.Model):
         Run one step of the model. If All agents are happy, halt the model.
         """
         #self.schedule.step_type(BackgroundAgent)
+        #if()
         self.happy = 0  # Reset counter of happy agents
         self.izq = 0
         self.cent = 0
@@ -266,6 +339,9 @@ class Schelling(mesa.Model):
         self.schedule.step_type(SchellingAgent)
         # collect data
         self.datacollector.collect(self)
+        self.dataizq.collect(self)
+        self.datacent.collect(self)
+        self.datader.collect(self)
         if self.happy == self.schedule.get_type_count(SchellingAgent):
             self.running = False
 
