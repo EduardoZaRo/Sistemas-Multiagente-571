@@ -22,8 +22,10 @@ Para la modificacion de grid en tiempo de simulacion se hace desde ModularVisual
                 visualization_elements=self.application.visualization_elements
                 if(value == "raza"):
                     model_params['ta'].value = 'raza'
-                else:
+                elif(value == "opinion_politica"):
                     model_params['ta'].value = 'opinion_politica'
+                else:
+                    model_params['ta'].value = 'dinero'
                 import mesa 
                 news = mesa.visualization.ModularServer(
                     model,
