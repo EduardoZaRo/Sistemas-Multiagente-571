@@ -11,6 +11,7 @@ Clase social agregada como un valor que se asigna al crear al agente y que varia
 
 
 ---Ultima version---
+
   Se agregó un clasificador donde se entrenan los agentes con sus reglas ciertas iteraciones y de ahi dependiendo de sus atributos predicen si son felices o no para moverse.
   
   Se agregaron diferentes tamanos para los grid, se cambian con el archivo server.py (Recomendado 50x50)
